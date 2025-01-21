@@ -1,0 +1,42 @@
+/* src/components/VacationCalculator.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Additional custom styles if needed */
+.group:hover .group-hover\:visible {
+    visibility: visible;
+}
+
+/* Ensure proper table layout */
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Custom transitions */
+.transition-colors {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .grid-cols-\[1fr_2fr_1fr\] {
+        grid-template-columns: 1fr;
+    }
+    
+    .max-w-4xl {
+        max-width: 100%;
+    }
+}
+
+.section-title {
+    text-align: left;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+    padding-left: 0.5rem;
+}
