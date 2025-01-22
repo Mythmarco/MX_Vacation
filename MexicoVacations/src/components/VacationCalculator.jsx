@@ -278,7 +278,7 @@ return (
                             </div>
 
                             <div>
-                                <label className="block">
+                                <label className="block text-left">
                                     <span className="font-bold block mb-2">Start Date:</span>
                                     <input
                                         type="date"
@@ -291,7 +291,7 @@ return (
                             </div>
 
                             <div>
-                                <label className="block">
+                                <label className="block text-left">
                                     <span className="font-bold block mb-2">Checking Date:</span>
                                     <input
                                         type="date"
@@ -304,7 +304,7 @@ return (
                             </div>
 
                             <div>
-                                <label className="block">
+                                <label className="block text-left">
                                     <span className="font-bold block mb-2">Vacation Days Taken:</span>
                                     <input
                                         type="number"
