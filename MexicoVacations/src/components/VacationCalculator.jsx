@@ -5,12 +5,6 @@ import './VacationCalculator.css';
 import logo from '../assets/logo.png'; 
 import VacationPeriodCalendar from './VacationPeriodCalendar';
 
-const calculateYearsOfService = (startDate) => {
-    if (!startDate) return 0;
-    const start = new Date(startDate);
-    const now = new Date();
-    return Math.floor((now - start) / (365.25 * 24 * 60 * 60 * 1000));
-};
 
 // Add calculation function
 const calculateSeniority = (startDate, checkingDate) => {
@@ -28,6 +22,7 @@ const VacationCalculator = () => {
     const [vacationDaysTaken, setVacationDaysTaken] = useState(0);
     const [checkingDate, setCheckingDate] = useState(new Date().toISOString().split('T')[0]);
     const [showHelp, setShowHelp] = useState(false);
+    const [decemberCutoff, setDecemberCutoff] = useState(false);
     
     const [currentBalance, setCurrentBalance] = useState({
         availableDays: 0,
@@ -69,33 +64,70 @@ const VacationCalculator = () => {
         if (yearsOfService < 26) return 28;
         return 30;
     };
-
+    const calculateFirstYearDays = (startDate, checkingDate, tierDays) => {
+        const start = new Date(startDate);
+        const check = new Date(checkingDate);
+        
+        // Calculate exact days between dates including both start and end date
+        const daysDiff = Math.floor((check - start) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Calculate daily factor with full precision (12/365 = 0.0328767123287671)
+        const dailyFactor = tierDays / 365;
+        
+        // Calculate accrued days with full precision
+        const accruedDays = dailyFactor * daysDiff;
+        
+        // Keep full precision during calculation and only round at the end
+        return Number(accruedDays.toFixed(2));
+    };
+    
+    const calculateNextPeriodDays = (lastAnniversaryDate, checkingDate, nextTierDays) => {
+        const anniversary = new Date(lastAnniversaryDate);
+        const check = new Date(checkingDate);
+        const daysDiff = Math.floor((check - anniversary) / (1000 * 60 * 60 * 24)) + 1;
+        const dailyFactor = Number((nextTierDays / 365).toFixed(4));
+        return Number((dailyFactor * daysDiff).toFixed(4)); // Keep 4 decimals for internal calculation
+    };
     const calculateAccruedDays = (startDateObj, checkDateObj) => {
         const monthsDiff = (checkDateObj.getFullYear() - startDateObj.getFullYear()) * 12 + 
                           (checkDateObj.getMonth() - startDateObj.getMonth()) +
                           (checkDateObj.getDate() >= startDateObj.getDate() ? 0 : -1);
         
         const yearsOfService = monthsDiff / 12;
+        const currentYearsOfService = Math.floor(yearsOfService);
         
         if (monthsDiff < 12) {
+            const firstYearDays = calculateFirstYearDays(
+                startDateObj, 
+                checkDateObj, 
+                calculateVacationDays(0)
+            );
             return {
-                current: Math.min(monthsDiff, 12),
+                current: firstYearDays, // Keep 4 decimals for calculation
                 next: 0,
                 currentTier: getTierLabel(yearsOfService),
                 nextTier: 'N/A'
             };
         }
-
-        const currentYearsOfService = Math.floor(yearsOfService);
+    
+        // After first year
         const annualDays = calculateVacationDays(currentYearsOfService);
         const nextYearAnnualDays = calculateVacationDays(currentYearsOfService + 1);
-        const monthsSinceLastAnniversary = monthsDiff % 12;
-        
-        const nextPeriodDays = (nextYearAnnualDays / 12) * monthsSinceLastAnniversary;
+    
+        // Calculate anniversary date for next period
+        const anniversaryDate = new Date(startDateObj);
+        anniversaryDate.setFullYear(anniversaryDate.getFullYear() + currentYearsOfService);
+    
+        // Calculate next period days using daily accrual
+        const nextPeriodAccrued = calculateNextPeriodDays(
+            anniversaryDate,
+            checkDateObj,
+            nextYearAnnualDays
+        );
         
         return {
             current: annualDays,
-            next: Math.round(nextPeriodDays * 10) / 10,
+            next: nextPeriodAccrued,
             currentTier: getTierLabel(currentYearsOfService),
             nextTier: getTierLabel(currentYearsOfService + 1)
         };
@@ -148,7 +180,7 @@ const VacationCalculator = () => {
             const nextExpirationDate = calculateExpirationDate(nextAnniversaryDate);
 
             let remainingDaysTaken = vacationDaysTaken;
-            let currentPeriodBalance = isCurrentPeriodExpired ? 0 : Math.round(accrued.current * 10) / 10;
+            let currentPeriodBalance = isCurrentPeriodExpired ? 0 : accrued.current;
             
             if (currentPeriodBalance >= remainingDaysTaken) {
                 currentPeriodBalance -= remainingDaysTaken;
@@ -164,14 +196,14 @@ const VacationCalculator = () => {
             }
             
             setCurrentBalance({
-                availableDays: Math.round(currentPeriodBalance * 10) / 10,
+                availableDays: Number((currentPeriodBalance).toFixed(2)), // Force 2 decimal places
                 expirationDate: currentExpirationDate,
                 isExpired: isCurrentPeriodExpired,
                 tier: accrued.currentTier
             });
             
             setNextBalance({
-                availableDays: Math.round(nextPeriodBalance * 10) / 10,
+                availableDays: Number(nextPeriodBalance.toFixed(2)), // Round to 2 decimals for display
                 expirationDate: nextExpirationDate,
                 tier: accrued.nextTier
             });
@@ -252,7 +284,36 @@ return (
                         <h2 className="text-xl font-bold mb-6 text-gray-700 border-b pb-3">
                             Input Information
                         </h2>
+                        
                         <div className="space-y-6">
+                            {/* December Cut-off section temporarily removed
+                            <div>
+                            <label className="block">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <span className="font-bold">December Cut-off</span>
+                                        <div className="relative group ml-2">
+                                            <Info className="h-5 w-5 text-gray-500" />
+                                            <div className="absolute left-0 mt-1 bg-gray-100 p-2 rounded text-sm w-64 invisible group-hover:visible z-10">
+                                                Toggle between calendar year and anniversary year calculation ***Section in development***
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="relative inline-flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={decemberCutoff}
+                                            onChange={(e) => setDecemberCutoff(e.target.checked)}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        <span className="ml-2 text-sm font-medium text-gray-700">
+                                            {decemberCutoff ? 'On' : 'Off'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </label>
+                            </div>*/}
                             <div>
                                 <label className="block">
                                     <div className="flex items-center mb-2">
@@ -346,7 +407,11 @@ return (
                                             </tr>
                                             <tr className="border-b">
                                                 <td className="py-2 px-4 text-left">Available Vacation Days:</td>
-                                                <td className="py-2 px-4">{currentBalance.availableDays}</td>
+                                                <td className="py-2 px-4">
+                                                    {typeof currentBalance.availableDays === 'number' 
+                                                        ? currentBalance.availableDays.toFixed(2) 
+                                                        : currentBalance.availableDays}
+                                                </td>
                                             </tr>
                                             <tr className="border-b">
                                                 <td className="py-2 px-4 text-left">Expiration Date:</td>
@@ -397,8 +462,8 @@ return (
                                             <span>Total Available Vacation Days: </span>
                                             <span className="font-bold">
                                                 {typeof currentBalance.availableDays === 'number' && 
-                                                 typeof nextBalance.availableDays === 'number' 
-                                                    ? (currentBalance.availableDays + nextBalance.availableDays).toFixed(1)
+                                                typeof nextBalance.availableDays === 'number' 
+                                                    ? (currentBalance.availableDays + nextBalance.availableDays).toFixed(2)
                                                     : 'N/A'}
                                             </span>
                                         </div>
